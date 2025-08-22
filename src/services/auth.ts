@@ -1,11 +1,18 @@
 import { ConfigManager } from '../config/manager';
 import { httpClient } from './http';
+import { FxiaokeResponseParser } from '../models/parser';
+import { FxiaokeAuthData } from '../models/response';
 
 export interface AuthResponse {
   success: boolean;
   accessToken?: string;
   corpId?: string;
   error?: string;
+}
+
+export interface AuthOptions {
+  verbose?: boolean;
+  debug?: boolean;
 }
 
 export class AuthService {
@@ -15,7 +22,7 @@ export class AuthService {
     this.configManager = new ConfigManager();
   }
 
-  async authenticate(): Promise<AuthResponse> {
+  async authenticate(options: AuthOptions = {}): Promise<AuthResponse> {
     try {
       const currentProfile = this.configManager.getCurrentProfile();
       if (!currentProfile) {
@@ -31,9 +38,6 @@ export class AuthService {
         };
       }
 
-      console.log('🔐 Authenticating with parameters:');
-      console.log('  Making API call to authentication endpoint...');
-      
       // Real Fxiaoke API endpoint
       const authEndpoint = '/cgi/corpAccessToken/get/V2';
       
@@ -44,10 +48,7 @@ export class AuthService {
         permanentCode
       };
       
-      console.log('📤 Request Data:', JSON.stringify(requestData, null, 2));
-      console.log('📡 Making POST request to authentication endpoint...');
-      
-      const response = await httpClient.post(authEndpoint, requestData);
+      const response = await httpClient.post(authEndpoint, requestData, { verbose: options.verbose, debug: options.debug });
 
       if (!response.success) {
         return { success: false, error: response.error || 'Authentication failed' };
@@ -77,47 +78,33 @@ export class AuthService {
     return currentProfile.corpId;
   }
 
-  private handleApiResponse(apiData: Record<string, any>, currentProfile: { name: string }): AuthResponse {
-    console.log('✅ API response received');
+  private handleApiResponse(apiData: unknown, currentProfile: { name: string }): AuthResponse {
+    // Use the Fxiaoke response parser for consistent error handling
+    const parsedResponse = FxiaokeResponseParser.parseAuthResponse(apiData);
     
-    // Debug: Log the actual response structure
-    console.log('📋 API Response Data:', JSON.stringify(apiData, null, 2));
+    if (!parsedResponse.success) {
+      return {
+        success: false,
+        error: parsedResponse.error || 'Authentication failed'
+      };
+    }
+
+    const authData = parsedResponse.data as FxiaokeAuthData;
     
-    // Handle Fxiaoke API response format
-    if (apiData) {
-      // Check for Fxiaoke API errors first
-      if (apiData.errorCode && apiData.errorCode !== 0) {
-        return {
-          success: false,
-          error: `Fxiaoke API Error (${apiData.errorCode}): ${apiData.errorMessage}`
-        };
-      }
+    if (authData.corpAccessToken && authData.corpId) {
+      // Save the real tokens to the current profile
+      this.configManager.setProfileValue(currentProfile.name, 'corpAccessToken', authData.corpAccessToken);
+      this.configManager.setProfileValue(currentProfile.name, 'corpId', authData.corpId);
       
-      // Extract the actual fields from your API response
-      // Update these field names based on your API spec
-      const accessToken = apiData.accessToken || apiData.token || apiData.access_token || apiData.corpAccessToken;
-      const corpId = apiData.corpId || apiData.corp_id || apiData.organizationId || apiData.corpId;
-      
-      if (accessToken && corpId) {
-        // Save the real tokens to the current profile
-        this.configManager.setProfileValue(currentProfile.name, 'corpAccessToken', accessToken);
-        this.configManager.setProfileValue(currentProfile.name, 'corpId', corpId);
-        
-        return {
-          success: true,
-          accessToken,
-          corpId
-        };
-      } else {
-        return {
-          success: false,
-          error: 'API response missing required fields (accessToken, corpId)'
-        };
-      }
+      return {
+        success: true,
+        accessToken: authData.corpAccessToken,
+        corpId: authData.corpId
+      };
     } else {
       return {
         success: false,
-        error: 'API response is empty or invalid'
+        error: 'API response missing required fields (corpAccessToken, corpId)'
       };
     }
   }

@@ -51,9 +51,11 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.get('/test');
       
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ message: 'success' });
-      expect(result.status).toBe(200);
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/test', undefined);
+      if (result.success) {
+        expect(result.data).toEqual(mockResponse.data);
+        expect(result.status).toBe(200);
+      }
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/test');
     });
 
     it('should handle GET request error', async () => {
@@ -69,7 +71,9 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.get('/test');
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Request error');
+      if (!result.success) {
+        expect(result.error).toContain('Request error');
+      }
     });
   });
 
@@ -86,9 +90,11 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.post('/test', postData);
       
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ id: 123 });
-      expect(result.status).toBe(201);
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/test', postData, undefined);
+      if (result.success) {
+        expect(result.data).toEqual({ id: 123 });
+        expect(result.status).toBe(201);
+      }
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/test', postData);
     });
 
     it('should handle POST request error', async () => {
@@ -104,7 +110,9 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.post('/test', {});
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Request error');
+      if (!result.success) {
+        expect(result.error).toContain('Request error');
+      }
     });
   });
 
@@ -121,9 +129,11 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.put('/test/123', putData);
       
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ updated: true });
-      expect(result.status).toBe(200);
-      expect(mockAxiosInstance.put).toHaveBeenCalledWith('/test/123', putData, undefined);
+      if (result.success) {
+        expect(result.data).toEqual({ updated: true });
+        expect(result.status).toBe(200);
+      }
+      expect(mockAxiosInstance.put).toHaveBeenCalledWith('/test/123', putData);
     });
   });
 
@@ -139,9 +149,11 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.delete('/test/123');
       
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ deleted: true });
-      expect(result.status).toBe(204);
-      expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/test/123', undefined);
+      if (result.success) {
+        expect(result.data).toEqual({ deleted: true });
+        expect(result.status).toBe(204);
+      }
+      expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/test/123');
     });
   });
 
@@ -163,8 +175,10 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.get('/not-found');
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('HTTP 404: Not Found');
-      expect(result.status).toBe(404);
+      if (!result.success) {
+        expect(result.error).toBe('Not Found');
+        expect(result.status).toBe(404);
+      }
     });
 
     it('should handle network errors', async () => {
@@ -181,8 +195,10 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.get('/timeout');
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Network error: No response received');
-      expect(result.status).toBe(0);
+      if (!result.success) {
+        expect(result.error).toBe('Network error: No response received');
+        expect(result.status).toBeUndefined();
+      }
     });
 
     it('should handle request setup errors', async () => {
@@ -198,8 +214,10 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.get('invalid-url');
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Request error: Invalid URL');
-      expect(result.status).toBe(0);
+      if (!result.success) {
+        expect(result.error).toBe('Request error: Invalid URL');
+        expect(result.status).toBeUndefined();
+      }
     });
 
     it('should handle non-axios errors', async () => {
@@ -212,8 +230,10 @@ describe('HttpClient', () => {
       const result = await httpClientInstance.get('/test');
       
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Unexpected error: Unexpected error');
-      expect(result.status).toBe(0);
+      if (!result.success) {
+        expect(result.error).toBe('Unexpected error');
+        expect(result.status).toBeUndefined();
+      }
     });
   });
 

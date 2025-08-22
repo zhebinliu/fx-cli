@@ -5,3 +5,4 @@
 5. Reply 'I am ready Boss' at the end of each task.
 6. If any URL is given, please read it thoroughly and don't make any guess unless you can find it in the reference URL.
 7. for each task, you need to tell me the exact steps to complete it.
+8. If you update the code, please update the test as well.

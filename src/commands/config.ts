@@ -5,27 +5,37 @@ export default class Config extends Command {
   static description = 'Manage CLI configuration';
 
   static flags = {
-    profile: Flags.string({
-      char: 'p',
-      description: 'Profile name to use',
-    }),
     list: Flags.boolean({
       char: 'l',
       description: 'List all profiles',
     }),
+    profile: Flags.string({
+      char: 'p',
+      description: 'Switch to a specific profile',
+    }),
     add: Flags.string({
+      char: 'a',
       description: 'Add a new profile',
     }),
     remove: Flags.string({
+      char: 'r',
       description: 'Remove a profile',
     }),
     set: Flags.string({
-      description: 'Set a profile value (format: key=value)',
       char: 's',
+      description: 'Set a profile value (format: key=value)',
     }),
     get: Flags.string({
-      description: 'Get a profile value',
       char: 'g',
+      description: 'Get a profile value',
+    }),
+    verbose: Flags.boolean({
+      char: 'v',
+      description: 'Enable verbose output',
+    }),
+    debug: Flags.boolean({
+      char: 'd',
+      description: 'Enable debug output (includes verbose)',
     }),
   };
 

@@ -1,5 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { ConfigManager } from '../config/manager';
+import { ApiResponse, ResponseFactory } from '../models/response';
+import { ErrorFactory } from '../models/error';
 
 export interface HttpClientConfig {
   baseURL: string;
@@ -7,16 +9,15 @@ export interface HttpClientConfig {
   userAgent: string;
 }
 
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  status?: number;
+export interface HttpOptions {
+  verbose?: boolean;
+  debug?: boolean;
 }
 
 export class HttpClient {
   private axiosInstance: AxiosInstance;
   private configManager: ConfigManager;
+  private currentOptions: HttpOptions = {};
 
   constructor() {
     this.configManager = new ConfigManager();
@@ -59,11 +60,18 @@ export class HttpClient {
           (config.headers as any)['Content-Type'] = 'application/json';
         }
 
-        // Log request (in development)
-        if (process.env.NODE_ENV === 'development') {
+        // Only log in verbose mode based on options
+        if (this.currentOptions.verbose || this.currentOptions.debug) {
           console.log(`🌐 HTTP Request: ${config.method?.toUpperCase()} ${config.url}`);
           if (config.data) {
             console.log('📤 Request Data:', JSON.stringify(config.data, null, 2));
+          }
+          
+          // Debug mode shows additional technical details
+          if (this.currentOptions.debug) {
+            console.log(`🔧 Debug: Base URL: ${config.baseURL}`);
+            console.log(`🔧 Debug: Timeout: ${config.timeout}ms`);
+            console.log(`🔧 Debug: Headers:`, JSON.stringify(config.headers, null, 2));
           }
         }
 
@@ -78,17 +86,22 @@ export class HttpClient {
     // Response interceptor
     this.axiosInstance.interceptors.response.use(
       (response: AxiosResponse) => {
-        // Log response (in development)
-        if (process.env.NODE_ENV === 'development') {
+        // Only log in verbose mode based on options
+        if (this.currentOptions.verbose || this.currentOptions.debug) {
           console.log(`✅ HTTP Response: ${response.status} ${response.config.url}`);
+          
+          // Debug mode shows additional response details
+          if (this.currentOptions.debug) {
+            console.log(`🔧 Debug: Response Headers:`, JSON.stringify(response.headers, null, 2));
+            console.log(`🔧 Debug: Response Size: ${JSON.stringify(response.data).length} bytes`);
+          }
         }
         return response;
       },
       (error: AxiosError) => {
-        // Log error response
+        // Always log errors for debugging
         if (error.response) {
           console.error(`❌ HTTP Error: ${error.response.status} ${error.config?.url}`);
-          console.error('📋 Error Response:', error.response.data);
         } else if (error.request) {
           console.error('❌ Network Error: No response received');
         } else {
@@ -102,14 +115,11 @@ export class HttpClient {
   /**
    * Make a GET request
    */
-  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async get<T>(url: string, options: HttpOptions = {}): Promise<ApiResponse<T>> {
+    this.currentOptions = options;
     try {
-      const response = await this.axiosInstance.get<T>(url, config);
-      return {
-        success: true,
-        data: response.data,
-        status: response.status
-      };
+      const response = await this.axiosInstance.get<T>(url);
+      return ResponseFactory.success(response.data, response.status);
     } catch (error) {
       return this.handleError(error);
     }
@@ -118,14 +128,11 @@ export class HttpClient {
   /**
    * Make a POST request
    */
-  async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async post<T>(url: string, data?: any, options: HttpOptions = {}): Promise<ApiResponse<T>> {
+    this.currentOptions = options;
     try {
-      const response = await this.axiosInstance.post<T>(url, data, config);
-      return {
-        success: true,
-        data: response.data,
-        status: response.status
-      };
+      const response = await this.axiosInstance.post<T>(url, data);
+      return ResponseFactory.success(response.data, response.status);
     } catch (error) {
       return this.handleError(error);
     }
@@ -134,14 +141,11 @@ export class HttpClient {
   /**
    * Make a PUT request
    */
-  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: any, options: HttpOptions = {}): Promise<ApiResponse<T>> {
+    this.currentOptions = options;
     try {
-      const response = await this.axiosInstance.put<T>(url, data, config);
-      return {
-        success: true,
-        data: response.data,
-        status: response.status
-      };
+      const response = await this.axiosInstance.put<T>(url, data);
+      return ResponseFactory.success(response.data, response.status);
     } catch (error) {
       return this.handleError(error);
     }
@@ -150,14 +154,11 @@ export class HttpClient {
   /**
    * Make a DELETE request
    */
-  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async delete<T>(url: string, options: HttpOptions = {}): Promise<ApiResponse<T>> {
+    this.currentOptions = options;
     try {
-      const response = await this.axiosInstance.delete<T>(url, config);
-      return {
-        success: true,
-        data: response.data,
-        status: response.status
-      };
+      const response = await this.axiosInstance.delete<T>(url);
+      return ResponseFactory.success(response.data, response.status);
     } catch (error) {
       return this.handleError(error);
     }
@@ -172,33 +173,28 @@ export class HttpClient {
       
       if (axiosError.response) {
         // Server responded with error status
-        return {
-          success: false,
-          error: `HTTP ${axiosError.response.status}: ${axiosError.response.statusText}`,
-          status: axiosError.response.status
-        };
+        return ResponseFactory.fromHttpStatus(
+          axiosError.response.status,
+          axiosError.response.statusText
+        );
       } else if (axiosError.request) {
         // Request made but no response
-        return {
-          success: false,
-          error: 'Network error: No response received',
-          status: 0
-        };
+        return ResponseFactory.error(
+          'Network error: No response received',
+          'NETWORK_ERROR'
+        );
       } else {
         // Request setup error
-        return {
-          success: false,
-          error: `Request error: ${axiosError.message}`,
-          status: 0
-        };
+        return ResponseFactory.error(
+          `Request error: ${axiosError.message}`,
+          'REQUEST_ERROR'
+        );
       }
     } else {
       // Non-axios error
-      return {
-        success: false,
-        error: `Unexpected error: ${error.message || 'Unknown error'}`,
-        status: 0
-      };
+      return ResponseFactory.fromException(
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 

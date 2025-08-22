@@ -4,6 +4,7 @@ import { run } from '@oclif/core';
 run().catch(console.error);
 
 export { run } from '@oclif/core';
-export * from './commands/hello';
-export * from './commands/config';
-export * from './commands/auth';
+export { default as hello } from './commands/hello.js';
+export { default as config } from './commands/config.js';
+export { default as auth } from './commands/auth.js';
+export { default as object } from './commands/object.js';
